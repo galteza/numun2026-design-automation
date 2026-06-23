@@ -1,11 +1,10 @@
-from unittest import case
-
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import textwrap
 from fpdf import FPDF
 import os
 import re
+import img2pdf
 
 from configs import NametagConfigs, CertificateConfigs, PlacardConfigs
 
@@ -357,7 +356,7 @@ class Placards:
         for index, row in df.iterrows():
             role = str(row['Role']).upper()
             committee = str(row['Committee'])
-            name = str(row['Name'])
+            name = str(row['Name']) if pd.notna(row['Name']) else ""
             country = str(row['Country/Affiliation']) if pd.notna(row['Country/Affiliation']) else ""
             code = str(row['Code']).lower() if 'Code' in row and pd.notna(row['Code']) else False
 
@@ -473,6 +472,289 @@ class Placards:
                     print(f"⚠️ Warning: Missing flag image at {flag_path}")
 
             img.save(os.path.join(output_dir, f"{index:03}_placard.png"))
-            print(f"Generated placard for {name}")    
+            print(f"Generated placard for {name}")
+
+    def generate_pdf(self, input_dir: str = None, output_dir: str = None):
+        import img2pdf
+        
+        if not input_dir:
+            input_dir = self.configs.placard_output_folder
+        if not output_dir:
+            output_dir = self.configs.placard_output_folder
+            
+        # 1. Grab and sort the generated image paths
+        placard_files = sorted([f for f in os.listdir(input_dir) if f.endswith('_placard.png')])
+        
+        if not placard_files:
+            print("❌ No placards found to compile into PDF!")
+            return
+            
+        # Get absolute paths of your files
+        file_paths = [os.path.join(input_dir, f) for f in placard_files]
+        output_file = os.path.join(output_dir, "print_placards.pdf")
+        
+        print(f"Compiling {len(file_paths)} placards into PDF using a raw data stream...")
+        
+        # 2. Force A4 landscape dimensions layout in img2pdf
+        # A4 size in points is 841.89 x 595.28
+        a4_landscape = (img2pdf.mm_to_pt(297), img2pdf.mm_to_pt(210))
+        layout_fun = img2pdf.get_layout_fun(a4_landscape)
+        
+        # 3. Direct streaming write (Bypasses image rendering engines entirely)
+        with open(output_file, "wb") as f:
+            f.write(img2pdf.convert(file_paths, layout_fun=layout_fun))
+            
+        print(f"✅ Success! Instantly generated {output_file}")
 
     
+class Certificates:
+    def __init__(self, configs: CertificateConfigs):
+        self.configs = configs
+        
+        # A4 Landscape dimensions in points (FPDF uses points, not pixels)
+        self.page_width = self.configs.certificate_length_px if hasattr(self.configs, 'certificate_length_px') else 841.89
+        self.page_height = self.configs.certificate_height_px if hasattr(self.configs, 'certificate_height_px') else 595.28
+
+    def _draw_text_autofit(self, draw: ImageDraw.Draw, 
+                           text: str, 
+                           max_width: float, 
+                           default_font_size: int, 
+                           y_position: float, 
+                           font_path: str, 
+                           color: str = "#133521", 
+                           position: str = "body"):
+        """
+        Draws centered text. Shrinks font size until it fits within max_width.
+        If it hits the minimum font size and still doesn't fit, wraps to the next line.
+        """
+        font_size = default_font_size
+        font = ImageFont.truetype(font_path, font_size)
+        min_font_size = int(10 * self.configs.pt_to_px)  # Default minimum font size
+        
+        if position == "title":
+            min_font_size = int(24 * self.configs.pt_to_px)
+        elif position == "name":
+            min_font_size = int(25 * self.configs.pt_to_px)
+        elif position == "body":
+            min_font_size = int(15.3 * self.configs.pt_to_px)
+
+        
+        # 1. Loop to reduce font size until it fits the allowed width
+        while font_size > min_font_size:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            
+            if text_width <= max_width:
+                break
+                
+            font_size -= 2 # Shrink and try again
+            font = ImageFont.truetype(font_path, font_size)
+
+        # 2. Re-calculate bounding box after the loop finishes
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        
+        # Exact horizontal center of the tag
+        center_x = self.configs.certificate_length_px / 2 + 2.3 * self.configs.ppcm
+
+        # 3. If it STILL doesn't fit, apply the multi-line wrap
+        if text_width > max_width:
+            # Estimate character width to find safe line breaks
+            char_bbox = draw.textbbox((0, 0), "M", font=font)
+            avg_char_width = char_bbox[2] - char_bbox[0]
+            
+            buffer = 30 if position == "name" and font_path == self.configs.name_font_path else 5  # Extra buffer to ensure text doesn't touch edges
+            max_chars_per_line = max(1, int(max_width / avg_char_width)) + buffer
+            wrapped_lines = textwrap.wrap(text, width=max_chars_per_line)
+            
+            line_height = char_bbox[3] - char_bbox[1]
+            line_spacing = 25  # Tight line spacing in pixels
+
+            current_y = y_position - (line_height + line_spacing) * (len(wrapped_lines) - 1) / 2 if position == "name" else y_position  # Center the block of text vertically
+            for line in wrapped_lines:
+                draw.text((center_x, current_y), line, fill=color, font=font, anchor="mt")
+                current_y += line_height + line_spacing
+                
+            total_height = current_y - y_position
+            return total_height
+            
+        # 4. If it fits perfectly on one line, draw normally
+        else:
+            if position == "name":
+                text_height = bbox[3] - bbox[1]
+                start_y = (y_position + self.configs.name_default_font_size/2) - text_height/2
+                draw.text((center_x, start_y), text, fill=color, font=font, anchor="mt")
+            else:
+                text_height = bbox[3] - bbox[1]
+                draw.text((center_x, y_position), text, fill=color, font=font, anchor="mt")
+            return text_height
+    
+    def generate_certificates(self, output_dir: str = None):
+        
+        df = pd.read_csv(self.configs.csv_path)
+        os.makedirs(output_dir, exist_ok=True)
+
+        for index, row in df.iterrows():
+            role = str(row['Role']).upper()
+            committee = str(row['Committee'])
+            name = str(row['Name']) if pd.notna(row['Name']) else ""
+
+            template_path = self.configs.certificate_template
+
+            match committee:
+                case "WHO":
+                    comm_name = "WORLD HEALTH ORGANIZATION"
+                case "ECOSOC":
+                    comm_name = "ECONOMIC AND SOCIAL COUNCIL"
+                case "UNSC":
+                    comm_name = "UNITED NATIONS SECURITY COUNCIL"
+                case "UNEP":
+                    comm_name = "国際連合環境計画 (UNEP)"
+                case "UNHCR":
+                    comm_name = "国際連合難民高等弁務官事務所 (UNHCR)"
+
+            try:
+                img = Image.open(template_path).convert("RGBA")
+            except FileNotFoundError:
+                print(f"Template missing for type: {role}. Skipping {name}.")
+                continue
+
+            drawer = ImageDraw.Draw(img)
+
+            # Print name
+            if bool(re.compile(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]').search(name)):
+                font_choice_path = self.configs.jp_name_font_path
+            elif bool(re.compile(r'^[A-Z\s]+$').match(name)):
+                font_choice_path = self.configs.name_caps_font_path
+            else:
+                font_choice_path = self.configs.name_font_path
+            
+            self._draw_text_autofit(drawer, 
+                                    name, 
+                                    self.configs.max_text_width, 
+                                    self.configs.name_default_font_size, 
+                                    self.configs.name_y_position, 
+                                    font_choice_path,
+                                    color="#385644",
+                                    position="name")
+
+            if role == "DELEGATE":
+                # Print title
+
+                self._draw_text_autofit(drawer,
+                                        "OF PARTICIPATION",
+                                        self.configs.max_text_width,
+                                        self.configs.title_default_font_size,
+                                        self.configs.title_y_position,
+                                        self.configs.title_font_path,
+                                        color="#385644",
+                                        position="title")
+
+                # Print body text
+                if committee in ["UNEP", "UNHCR"]:
+                    body_text = f"2026年6月27日・28日に開催された「第6回 名古屋大学模擬国連 (NUMUN) 2026」において、{comm_name} 委員会に代表（デリゲート）として参加し、多大な貢献をされたことをここに証します。"
+                    font_choice_path = self.configs.jp_name_font_path
+                elif committee in ["WHO", "ECOSOC", "UNSC"]:
+                    body_text = f"for their participation as a delegate in the {comm_name} committee at the 6th Nagoya University Model United Nations (NUMUN) 2026, held on the 27th and 28th of June 2026."
+                    font_choice_path = self.configs.body_font_path
+
+                self._draw_text_autofit(drawer, 
+                                        body_text,
+                                        self.configs.max_text_width,
+                                        self.configs.body_default_font_size,
+                                        self.configs.body_y_position,
+                                        font_choice_path,
+                                        color="#385644",
+                                        position="body")
+            
+            elif role == "CHAIR" or role == "CO-CHAIR":
+                self._draw_text_autofit(drawer,
+                                        "OF APPRECIATION",
+                                        self.configs.max_text_width,
+                                        self.configs.title_default_font_size,
+                                        self.configs.title_y_position,
+                                        self.configs.title_font_path,
+                                        color="#385644",
+                                        position="title")
+                if committee in ["UNEP", "UNHCR"]:
+                    body_text = f"2026年6月27日・28日に開催された「第6回 名古屋大学模擬国連 (NUMUN) 2026」において、{comm_name} 委員会の議長（チェア）として参加し、多大な貢献をされたことをここに証します。"
+                    font_choice_path = self.configs.jp_name_font_path
+                elif committee in ["WHO", "ECOSOC", "UNSC"]:
+                    body_text = f"for their contribution as a chair in the {comm_name} committee at the 6th Nagoya University Model United Nations (NUMUN) 2026, held on the 27th and 28th of June 2026."
+                    font_choice_path = self.configs.body_font_path
+                
+                self._draw_text_autofit(drawer,
+                                        body_text,
+                                        self.configs.max_text_width,
+                                        self.configs.body_default_font_size,
+                                        self.configs.body_y_position,
+                                        font_choice_path,
+                                        color="#385644",
+                                        position="body")
+            elif role == "SUPPORTER" or role == "OBSERVER":
+                self._draw_text_autofit(drawer,
+                                        "OF APPRECIATION",
+                                        self.configs.max_text_width,
+                                        self.configs.title_default_font_size,
+                                        self.configs.title_y_position,
+                                        self.configs.title_font_path,
+                                        color="#385644",
+                                        position="title")
+                body_text = f"for their support and contribution to the 6th Nagoya University Model United Nations (NUMUN) 2026, held on the 27th and 28th of June 2026."
+                font_choice_path = self.configs.body_font_path
+                self._draw_text_autofit(drawer,
+                                        body_text,
+                                        self.configs.max_text_width,
+                                        self.configs.body_default_font_size,
+                                        self.configs.body_y_position,
+                                        font_choice_path,
+                                        color="#385644",
+                                        position="body")
+            elif role == "STAFF":
+                self._draw_text_autofit(drawer,
+                                        "OF RECOGNITION",
+                                        self.configs.max_text_width,
+                                        self.configs.title_default_font_size,
+                                        self.configs.title_y_position,
+                                        self.configs.title_font_path,
+                                        color="#385644",
+                                        position="title")
+                body_text = f"for their hard work and dedication in organizing the 6th Nagoya University Model United Nations (NUMUN) 2026, held on the 27th and 28th of June 2026."
+                font_choice_path = self.configs.body_font_path
+                self._draw_text_autofit(drawer,
+                                        body_text,
+                                        self.configs.max_text_width,
+                                        self.configs.body_default_font_size,
+                                        self.configs.body_y_position,
+                                        font_choice_path,
+                                        color="#385644",
+                                        position="body")
+
+            img.save(os.path.join(output_dir, f"{index:03}_certificate.png"))
+            print(f"Generated certificate for {name}")
+
+    def generate_pdf(self, input_dir: str = None, output_dir: str = None):
+            
+        # 1. Grab and sort the generated image paths
+        certificate_files = sorted([f for f in os.listdir(input_dir) if f.endswith('_certificate.png')])
+        
+        if not certificate_files:
+            print("❌ No certificates found to compile into PDF!")
+            return
+            
+        # Get absolute paths of your files
+        file_paths = [os.path.join(input_dir, f) for f in certificate_files]
+        output_file = os.path.join(output_dir, "print_certificates.pdf")
+        
+        print(f"Compiling {len(file_paths)} certificates into PDF using a raw data stream...")
+        
+        # 2. Force A4 landscape dimensions layout in img2pdf
+        # A4 size in points is 841.89 x 595.28
+        a4_landscape = (img2pdf.mm_to_pt(297), img2pdf.mm_to_pt(210))
+        layout_fun = img2pdf.get_layout_fun(a4_landscape)
+        
+        # 3. Direct streaming write (Bypasses image rendering engines entirely)
+        with open(output_file, "wb") as f:
+            f.write(img2pdf.convert(file_paths, layout_fun=layout_fun))
+            
+        print(f"✅ Success! Instantly generated {output_file}")

@@ -76,11 +76,6 @@ class NametagConfigs:
     bento_size: tuple = (int(1.3*ppcm), int(1.3*ppcm))
 
 @dataclass
-class CertificateConfigs:
-    certificate_template: str = "assets/templates/certificates/certificate_template.png"
-    certificate_output_folder: str = "output_certificates"
-
-@dataclass
 class PlacardConfigs:
     csv_path: str = f"database/trial.csv"
     assets_folder: str = "assets"
@@ -134,4 +129,45 @@ class PlacardConfigs:
     flag_size: tuple = (int(4.35*ppcm), int(2.5*ppcm))
     flag_x_position: int = int(24.6*ppcm)
     flag_y_position: int = int(11.2*ppcm)
-    
+
+@dataclass
+class CertificateConfigs:
+    csv_path: str = f"database/trial.csv"
+    assets_folder: str = "assets"
+    certificate_template: str = os.path.join(assets_folder, "templates", "certificates", "certificate_template.png")
+    certificate_output_name: str = "output_certificates"
+
+    title_font: str = "CerebriSans-Bold.ttf"
+    title_font_path: str = os.path.join(assets_folder, "fonts", title_font)
+
+    name_font: str = "Amoresa Aged.otf"
+    name_font_path: str = os.path.join(assets_folder, "fonts", name_font)
+
+    name_caps_font: str = "ITCBenguiatStdBoldCn.otf"
+    name_caps_font_path: str = os.path.join(assets_folder, "fonts", name_caps_font)
+
+    jp_name_font: str = "YujiSyuku-Regular.ttf"
+    jp_name_font_path: str = os.path.join(assets_folder, "fonts", jp_name_font)
+
+    body_font: str = "CerebriSans-Regular.ttf"
+    body_font_path: str = os.path.join(assets_folder, "fonts", body_font)
+
+    # --- MATH & CONVERSIONS ---
+    DPI: int = 300
+    ppcm: float = DPI / 2.54          # ~118.11 px per cm
+    pt_to_px: float = DPI / 72.0      # ~4.166 px per pt
+
+    certificate_length_px: float = int(29.7 * ppcm) # A4 length
+
+    certificate_height_px: float = int(21.0 * ppcm) # A4 width
+    left_margin_px: float = int(6.6 * ppcm)
+    right_margin_px: float = int(2.0 * ppcm)
+
+    title_y_position: float = 4.6*ppcm
+    title_default_font_size: float = 26.5*pt_to_px
+    name_y_position: float = 7.9*ppcm
+    name_default_font_size: float = 52*pt_to_px
+    body_y_position: float = 10.9*ppcm
+    body_default_font_size: float = 15.4*pt_to_px
+
+    max_text_width: float = certificate_length_px - (left_margin_px + right_margin_px)

@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "fpdf>=1.7.2",
+    "img2pdf>=0.6.3",
     "pandas>=3.0.3",
     "pillow>=12.2.0",
 ]
