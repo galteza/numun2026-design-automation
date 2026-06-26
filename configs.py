@@ -4,7 +4,7 @@ import os
 @dataclass
 class NametagConfigs:
     
-    csv_path: str = f"database/trial.csv"
+    csv_path: str = f"database/participants-v1.csv"
 
     # File paths for fonts and templates
     name_font: str = "ITCBenguiatStdBoldCnIt.otf"
@@ -77,7 +77,7 @@ class NametagConfigs:
 
 @dataclass
 class PlacardConfigs:
-    csv_path: str = f"database/trial.csv"
+    csv_path: str = f"database/participants-v1.csv"
     assets_folder: str = "assets"
 
     comm_logos_folder: str = os.path.join(assets_folder, "comm-logos")
@@ -132,7 +132,7 @@ class PlacardConfigs:
 
 @dataclass
 class CertificateConfigs:
-    csv_path: str = f"database/trial.csv"
+    csv_path: str = f"database/participants-v1.csv"
     assets_folder: str = "assets"
     certificate_template: str = os.path.join(assets_folder, "templates", "certificates", "certificate_template.png")
     certificate_output_name: str = "output_certificates"

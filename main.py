@@ -18,22 +18,22 @@ if __name__ == "__main__":
     certificate_configs = CertificateConfigs()
     output_dir = create_now_folder()
 
-    # # Generate Nametags
+    # # # Generate Nametags
 
-    nametag_builder = Nametags(nametag_configs)
-    output_nametags_dir = os.path.join(output_dir, nametag_configs.nametags_output)
-    nametag_builder.generate_individual_tags(output_nametags_dir)
-    print("Done generating all individual tags!")
-    nametag_builder.generate_pdf(output_nametags_dir, output_dir)
-    print("Done generating PDF of nametags!")
+    # nametag_builder = Nametags(nametag_configs)
+    # output_nametags_dir = os.path.join(output_dir, nametag_configs.nametags_output)
+    # nametag_builder.generate_individual_tags(output_nametags_dir)
+    # print("Done generating all individual tags!")
+    # nametag_builder.generate_pdf(output_nametags_dir, output_dir)
+    # print("Done generating PDF of nametags!")
 
-    # # Generate Certificates
+    # # # Generate Certificates
 
-    certificates_builder = Certificates(certificate_configs)
-    output_certs_dir = os.path.join(output_dir, certificate_configs.certificate_output_name)
-    certificates_builder.generate_certificates(output_certs_dir)
-    certificates_builder.generate_pdf(output_certs_dir, output_dir)
-    print("Done generating PDF of certificates!")
+    # certificates_builder = Certificates(certificate_configs)
+    # output_certs_dir = os.path.join(output_dir, certificate_configs.certificate_output_name)
+    # certificates_builder.generate_certificates(output_certs_dir)
+    # certificates_builder.generate_pdf(output_certs_dir, output_dir)
+    # print("Done generating PDF of certificates!")
 
     # Generate Placards
 

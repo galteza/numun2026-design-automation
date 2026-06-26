@@ -323,7 +323,7 @@ class Placards:
             char_bbox = draw.textbbox((0, 0), "M", font=font)
             avg_char_width = char_bbox[2] - char_bbox[0]
             
-            max_chars_per_line = max(1, int(max_width / avg_char_width)) + 10
+            max_chars_per_line = max(1, int(max_width / avg_char_width)) + 11
             wrapped_lines = textwrap.wrap(text, width=max_chars_per_line)
             
             line_height = char_bbox[3] - char_bbox[1]
@@ -638,6 +638,10 @@ class Certificates:
                                     color="#385644",
                                     position="name")
 
+            if name == "":
+                print(f"⚠️ Warning: Name is empty for row {index}. Skipping certificate generation.")
+                continue
+
             if role == "DELEGATE":
                 # Print title
 
@@ -720,6 +724,25 @@ class Certificates:
                                         color="#385644",
                                         position="title")
                 body_text = f"for their hard work and dedication in organizing the 6th Nagoya University Model United Nations (NUMUN) 2026, held on the 27th and 28th of June 2026."
+                font_choice_path = self.configs.body_font_path
+                self._draw_text_autofit(drawer,
+                                        body_text,
+                                        self.configs.max_text_width,
+                                        self.configs.body_default_font_size,
+                                        self.configs.body_y_position,
+                                        font_choice_path,
+                                        color="#385644",
+                                        position="body")
+            elif role == "VOLUNTEER":
+                self._draw_text_autofit(drawer,
+                                        "OF RECOGNITION",
+                                        self.configs.max_text_width,
+                                        self.configs.title_default_font_size,
+                                        self.configs.title_y_position,
+                                        self.configs.title_font_path,
+                                        color="#385644",
+                                        position="title")
+                body_text = f"for their invaluable assistance and dedication as a volunteer during the 6th Nagoya University Model United Nations (NUMUN) 2026, held on the 27th and 28th of June 2026."
                 font_choice_path = self.configs.body_font_path
                 self._draw_text_autofit(drawer,
                                         body_text,
